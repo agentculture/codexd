@@ -44,7 +44,7 @@ def find_pyproject() -> Path:
 def read_version(path: Path) -> str:
     """Extract version string from pyproject.toml."""
     text = path.read_text()
-    match = re.search(r'^version\s*=\s*"([^"]+)"', text, re.MULTILINE)
+    match = re.search(r'^\s*version\s*=\s*"([^"]+)"', text, re.MULTILINE)
     if not match:
         print("ERROR: version field not found in pyproject.toml", file=sys.stderr)
         sys.exit(1)
@@ -74,8 +74,26 @@ def bump(version: str, part: str) -> str:
 def write_version(path: Path, old: str, new: str) -> None:
     """Replace old version with new in pyproject.toml."""
     text = path.read_text()
-    updated = text.replace(f'version = "{old}"', f'version = "{new}"', 1)
+    pattern = re.compile(
+        rf'(?m)^(?P<prefix>\s*version\s*=\s*")'
+        rf'{re.escape(old)}'
+        rf'(?P<suffix>"\s*)$'
+    )
+    updated, replacements = pattern.subn(rf"\g<prefix>{new}\g<suffix>", text)
+    if replacements != 1:
+        print(
+            f"ERROR: expected exactly one pyproject.toml version replacement, got {replacements}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     path.write_text(updated)
+    verified = read_version(path)
+    if verified != new:
+        print(
+            f"ERROR: version rewrite verification failed: expected {new}, found {verified}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 
 def read_changelog_entries() -> dict:

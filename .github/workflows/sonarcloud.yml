@@ -1,0 +1,38 @@
+name: SonarCloud
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  sonarcloud:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # Match the AgentCulture steward convention: expose SONAR_TOKEN itself as
+    # job env, then gate the scan on it being present. Fork PRs and repos
+    # without the secret skip the scan instead of failing the workflow.
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          # Sonar needs full git history for accurate new-code attribution.
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
+
+      - run: uv python install 3.12
+
+      - run: uv sync
+
+      - name: Generate coverage
+        run: uv run pytest -n auto --cov=codexd --cov-report=xml:coverage.xml --cov-report=term -v
+
+      - name: SonarCloud Scan
+        if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6
+        env:
+          SONAR_HOST_URL: https://sonarcloud.io

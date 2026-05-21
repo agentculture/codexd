@@ -26,8 +26,8 @@ set -euo pipefail
 #                          Source of truth for the `await` gate.
 #   await  <PR>            Codexd extension: `read --wait` for the
 #                          briefing, then `status` for the gate. Exits
-#                          non-zero on SonarCloud ERROR or unresolved
-#                          threads. Tunables:
+#                          non-zero unless SonarCloud is OK and all review
+#                          threads are resolved. Tunables:
 #                            CODEXD_PR_AWAIT_WAIT (default 1800)
 #                              — seconds passed to `read --wait`.
 #                            CODEXD_PR_AWAIT_SECONDS (legacy)
@@ -124,24 +124,25 @@ case "$cmd" in
         fi
 
         # 3. Gate. Markers in pr-status.sh output:
-        #     "Quality Gate ERROR"          → Sonar fail
-        #     "Unresolved: N" with N>0      → unresolved threads
-        SONAR_FAIL=0
+        #     "Quality Gate OK"             -> Sonar pass
+        #     any other Quality Gate state  -> Sonar fail
+        #     "Unresolved: N" with N>0      -> unresolved threads
+        SONAR_OK=0
         UNRESOLVED=0
-        if printf '%s\n' "$STATUS_OUT" | grep -qE 'Quality Gate ERROR'; then
-            SONAR_FAIL=1
+        if printf '%s\n' "$STATUS_OUT" | grep -qE 'Quality Gate OK'; then
+            SONAR_OK=1
         fi
         if PENDING=$(printf '%s\n' "$STATUS_OUT" | grep -oE 'Unresolved:[[:space:]]+[0-9]+' | grep -oE '[0-9]+$' | head -1); then
             [ -n "${PENDING:-}" ] && [ "$PENDING" -gt 0 ] && UNRESOLVED=1
         fi
-        if [ "$SONAR_FAIL" -eq 1 ] || [ "$UNRESOLVED" -eq 1 ]; then
+        if [ "$SONAR_OK" -ne 1 ] || [ "$UNRESOLVED" -eq 1 ]; then
             echo >&2
-            [ "$SONAR_FAIL" -eq 1 ] && echo "✗ SonarCloud quality gate ERROR" >&2
+            [ "$SONAR_OK" -ne 1 ] && echo "✗ SonarCloud quality gate is not OK" >&2
             [ "$UNRESOLVED" -eq 1 ] && echo "✗ ${PENDING} unresolved review thread(s)" >&2
             exit 1
         fi
         echo >&2
-        echo "✓ no SonarCloud ERROR, no unresolved threads" >&2
+        echo "✓ SonarCloud OK, no unresolved threads" >&2
         ;;
     help|--help|-h)
         sed -n '4,38p' "${BASH_SOURCE[0]}" | sed 's/^# *//'

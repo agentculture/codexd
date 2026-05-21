@@ -34,11 +34,10 @@ PR_NUMBER="${1:?Usage: pr-status.sh [--repo OWNER/REPO] [--sonar-key KEY] PR_NUM
 if [[ -z "$REPO" ]]; then
     REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 fi
-# Sonar key precedence: explicit --sonar-key flag > SONAR_PROJECT_KEY env >
-# `<owner>_<repo>` derivation. Mirrors pr-comments.sh so SKILL.md's claim
-# that the env var works for both scripts is true.
+# Sonar key precedence: explicit --sonar-key flag > SONAR_PROJECT env >
+# legacy SONAR_PROJECT_KEY env > `<owner>_<repo>` derivation.
 if [[ -z "$SONAR_KEY" ]]; then
-    SONAR_KEY="${SONAR_PROJECT_KEY:-${REPO%%/*}_${REPO##*/}}"
+    SONAR_KEY="${SONAR_PROJECT:-${SONAR_PROJECT_KEY:-${REPO%%/*}_${REPO##*/}}}"
 fi
 
 # ── 1. PR header ──────────────────────────────────────────────────────────
