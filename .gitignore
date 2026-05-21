@@ -203,6 +203,9 @@ cython_debug/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
 
+# Codex / AgentCulture local skill config
+.agents/skills.local.yaml
+
 # Ruff stuff:
 .ruff_cache/
 
