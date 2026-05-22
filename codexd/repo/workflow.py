@@ -70,7 +70,10 @@ def run_repo_task(
             return 0
         commit_sha = git.commit_all(checkout, f"codexd: {task[:64]}")
         git.push_branch(checkout, branch)
-        print(f"pushed: workspace={checkout} branch={branch} commit={commit_sha} target=origin/{branch}")
+        print(
+            f"pushed: workspace={checkout} branch={branch} commit={commit_sha} "
+            f"target=origin/{branch}"
+        )
         return 0
     except ValueError as exc:
         _hint(str(exc))

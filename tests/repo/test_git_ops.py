@@ -5,7 +5,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from codexd.repo.git import checkout_branch, commit_all, has_changes, push_branch, run_git
+from codexd.repo.git import checkout_branch, commit_all, has_changes, push_branch
 
 
 def _git(path: Path, *args: str) -> subprocess.CompletedProcess[str]:

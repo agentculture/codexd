@@ -13,8 +13,8 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 from opentelemetry import trace as _otel_trace
 
-from codexd.aio import maybe_await
 from codexd.agent import constants as _codex_const
+from codexd.aio import maybe_await
 from codexd.harness.telemetry import _HARNESS_TRACER_NAME, record_llm_call
 
 if TYPE_CHECKING:
@@ -426,7 +426,10 @@ class CodexAgentRunner:
                 f"inner _send_request {_codex_const.INNER_REQUEST_TIMEOUT_SECONDS}s"
             )
         else:
-            budgets = f"inner _send_request {_codex_const.INNER_REQUEST_TIMEOUT_SECONDS}s (outer disabled)"
+            budgets = (
+                f"inner _send_request {_codex_const.INNER_REQUEST_TIMEOUT_SECONDS}s "
+                "(outer disabled)"
+            )
         logger.warning(
             "Codex turn timed out after %.1fs (budgets: %s); terminating "
             "subprocess so cleanup → on_exit fires for crash recovery",

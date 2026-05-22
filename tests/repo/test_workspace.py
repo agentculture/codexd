@@ -58,3 +58,27 @@ def test_remote_validation_rejects_local_paths() -> None:
 def test_checkout_name_is_sanitized() -> None:
     assert derive_checkout_name("https://github.com/AgentCulture/codexd.git") == "codexd"
     assert derive_checkout_name("git@github.com:AgentCulture/codex-guide.git") == "codex-guide"
+
+
+def test_workspace_refuses_home(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+    with pytest.raises(ValueError, match="home"):
+        validate_workspace_path(tmp_path, repo_root=tmp_path / "repo")
+
+
+def test_branch_validation_rejects_empty_and_untrimmed() -> None:
+    with pytest.raises(ValueError, match="trimmed"):
+        validate_branch_name(" main")
+    with pytest.raises(ValueError, match="trimmed"):
+        validate_branch_name("")
+
+
+def test_branch_validation_rejects_invalid_characters() -> None:
+    with pytest.raises(ValueError, match="branch"):
+        validate_branch_name("feature name")
+
+
+def test_checkout_name_rejects_empty_remote_name() -> None:
+    with pytest.raises(ValueError, match="usable"):
+        derive_checkout_name("https://github.com/AgentCulture/.git")

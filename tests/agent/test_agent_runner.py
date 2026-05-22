@@ -23,7 +23,6 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 
 from codexd.agent.agent_runner import CodexAgentRunner
 from codexd.harness.telemetry import (
-    HarnessMetricsRegistry,
     _build_registry,
     reset_for_tests,
 )
