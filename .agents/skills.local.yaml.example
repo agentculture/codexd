@@ -1,8 +1,8 @@
-# Per-machine config read by codexd's repo-local skill scripts.
+# Optional per-machine values for local alignment workflows.
 # Copy this to .agents/skills.local.yaml (git-ignored) and adjust locally.
-# Skills should read the local file first and fall back to this example.
 # Codex discovers skills from .agents/skills; this file is not a discovery
-# manifest.
+# manifest. Current repo-local scripts do not automatically load this file;
+# follow each script's documented config source.
 
 # Path to the Culture server's agent manifest.
 culture_server_yaml: ~/.culture/server.yaml

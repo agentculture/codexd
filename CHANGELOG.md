@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Clarified repo-local Codex skill discovery and invocation docs for $cicd and $communicate.
+- Clarified repo-local Codex skill discovery, skill invocation, and per-machine config docs.
 
 ## [0.1.1] - 2026-05-22
 
