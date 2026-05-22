@@ -1,6 +1,6 @@
 [project]
 name = "codexd"
-version = "0.1.2"
+version = "0.1.3"
 description = "Codex daemon for delegated repo tasks and reviewable PRs."
 readme = "README.md"
 license = "MIT"
