@@ -91,9 +91,7 @@ def test_init_metrics_enabled_installs_provider(
     """
 
     exporter_kwargs: list[dict] = []
-    monkeypatch.setattr(
-        metrics, "OTLPMetricExporter", _stub_metric_exporter_class(exporter_kwargs)
-    )
+    monkeypatch.setattr(metrics, "OTLPMetricExporter", _stub_metric_exporter_class(exporter_kwargs))
     cfg = _make_config(
         enabled=True,
         metrics_enabled=True,
@@ -112,9 +110,7 @@ def test_init_metrics_enabled_default_compression_uses_grpc_enum(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     exporter_kwargs: list[dict] = []
-    monkeypatch.setattr(
-        metrics, "OTLPMetricExporter", _stub_metric_exporter_class(exporter_kwargs)
-    )
+    monkeypatch.setattr(metrics, "OTLPMetricExporter", _stub_metric_exporter_class(exporter_kwargs))
     cfg = _make_config(enabled=True, metrics_enabled=True)
 
     metrics.init_metrics(cfg)
@@ -139,9 +135,7 @@ def test_init_metrics_enabled_reinit_keeps_first_global_provider(
         set_calls += 1
         real_set_meter_provider(provider)
 
-    monkeypatch.setattr(
-        metrics, "OTLPMetricExporter", _stub_metric_exporter_class(exporter_kwargs)
-    )
+    monkeypatch.setattr(metrics, "OTLPMetricExporter", _stub_metric_exporter_class(exporter_kwargs))
     monkeypatch.setattr(metrics.metrics, "set_meter_provider", _counting_set_meter_provider)
 
     first = _make_config(enabled=True, metrics_enabled=True)

@@ -516,9 +516,7 @@ def test_writer_loop_counts_open_failure_as_error(
     metrics.audit_writes.add.assert_called_with(1, {"outcome": "error"})
 
 
-def test_writer_loop_counts_write_oserror(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_writer_loop_counts_write_oserror(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     metrics = _stub_metrics()
     sink = audit.AuditSink(
         server_name="x",

@@ -97,8 +97,7 @@ def _grpc_compression(value: str | None) -> grpc.Compression:
     if value == "gzip":
         return grpc.Compression.Gzip
     raise ValueError(
-        "Unsupported telemetry.otlp_compression "
-        f"{value!r}; expected 'gzip', 'none', or empty"
+        "Unsupported telemetry.otlp_compression " f"{value!r}; expected 'gzip', 'none', or empty"
     )
 
 
@@ -239,9 +238,7 @@ def init_metrics(config: ServerConfig) -> MetricsRegistry:
         return _registry
 
     if _global_meter_provider_is_set():
-        logger.info(
-            "OTEL metrics provider already installed; reusing existing global provider"
-        )
+        logger.info("OTEL metrics provider already installed; reusing existing global provider")
         _registry = _build_registry(metrics.get_meter(_CULTURE_METER_NAME))
         _initialized_for = snapshot
         return _registry

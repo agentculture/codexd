@@ -64,8 +64,7 @@ def _grpc_compression(value: str | None) -> grpc.Compression:
     if value == "gzip":
         return grpc.Compression.Gzip
     raise ValueError(
-        "Unsupported telemetry.otlp_compression "
-        f"{value!r}; expected 'gzip', 'none', or empty"
+        "Unsupported telemetry.otlp_compression " f"{value!r}; expected 'gzip', 'none', or empty"
     )
 
 
@@ -124,9 +123,7 @@ def init_telemetry(config: ServerConfig) -> Tracer:
         return _tracer
 
     if _global_tracer_provider_is_set():
-        logger.info(
-            "OTEL tracing provider already installed; reusing existing global provider"
-        )
+        logger.info("OTEL tracing provider already installed; reusing existing global provider")
         _tracer = trace.get_tracer(_CULTURE_TRACER_NAME)
         _initialized_for = snapshot
         return _tracer

@@ -11,7 +11,6 @@ from __future__ import annotations
 import logging
 
 import grpc
-
 import pytest
 from agentirc.config import ServerConfig, TelemetryConfig
 from opentelemetry.sdk.trace.sampling import (
@@ -121,9 +120,7 @@ def test_init_telemetry_enabled_default_compression_uses_grpc_enum(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     exporter_kwargs: list[dict] = []
-    monkeypatch.setattr(
-        tracing, "OTLPSpanExporter", _stub_span_exporter_class(exporter_kwargs)
-    )
+    monkeypatch.setattr(tracing, "OTLPSpanExporter", _stub_span_exporter_class(exporter_kwargs))
     cfg = _make_config(enabled=True, traces_enabled=True)
 
     tracing.init_telemetry(cfg)
@@ -148,12 +145,8 @@ def test_init_telemetry_enabled_reinit_keeps_first_global_provider(
         set_calls += 1
         real_set_tracer_provider(provider)
 
-    monkeypatch.setattr(
-        tracing, "OTLPSpanExporter", _stub_span_exporter_class(exporter_kwargs)
-    )
-    monkeypatch.setattr(
-        tracing.trace, "set_tracer_provider", _counting_set_tracer_provider
-    )
+    monkeypatch.setattr(tracing, "OTLPSpanExporter", _stub_span_exporter_class(exporter_kwargs))
+    monkeypatch.setattr(tracing.trace, "set_tracer_provider", _counting_set_tracer_provider)
 
     first = _make_config(enabled=True, traces_enabled=True)
     second = _make_config(enabled=True, traces_enabled=True)
@@ -177,9 +170,7 @@ def test_init_telemetry_enabled_installs_provider(
     """
 
     exporter_kwargs: list[dict] = []
-    monkeypatch.setattr(
-        tracing, "OTLPSpanExporter", _stub_span_exporter_class(exporter_kwargs)
-    )
+    monkeypatch.setattr(tracing, "OTLPSpanExporter", _stub_span_exporter_class(exporter_kwargs))
     cfg = _make_config(
         enabled=True,
         traces_enabled=True,
