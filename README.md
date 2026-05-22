@@ -18,10 +18,15 @@ uv run pytest -n auto --cov=codexd
 ## Codex Conventions
 
 - Repository instructions live in `AGENTS.md`.
-- Repo-local skills live in `.agents/skills`.
-- Per-machine skill config should be copied from
-  `.agents/skills.local.yaml.example` to `.agents/skills.local.yaml`, which is
-  ignored by Git.
+- Repo-local skills live in `.agents/skills` and are auto-discovered when Codex
+  starts inside this repository.
+- Use `/skills` or `$` completion to find available skills. Invoke the repo
+  workflow skills as `$cicd` and `$communicate`; `/cicd` and `/communicate` are
+  not Codex skill invocations.
+- `.agents/skills.local.yaml.example` documents optional per-machine values
+  for local workflow tooling. A copied `.agents/skills.local.yaml` is ignored
+  by Git and is not used for Codex skill discovery.
 
 The local `$HOME/.codex/skills` path is treated as an environment-specific
-install location, not a committed repository layout.
+install location, not a committed repository layout. Restart Codex if newly
+changed repo-local skills do not appear in `/skills`.
