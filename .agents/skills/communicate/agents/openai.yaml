@@ -1,0 +1,4 @@
+interface:
+  display_name: "Communicate"
+  short_description: "Coordinate issues and mesh messages"
+  default_prompt: "Use $communicate to file or follow up on a tracked cross-repo issue."

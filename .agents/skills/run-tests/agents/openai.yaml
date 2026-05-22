@@ -1,0 +1,4 @@
+interface:
+  display_name: "Run Tests"
+  short_description: "Run pytest with coverage options"
+  default_prompt: "Use $run-tests to run the codexd test suite and report failures."
