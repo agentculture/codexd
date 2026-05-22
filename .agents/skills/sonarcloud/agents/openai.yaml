@@ -1,0 +1,4 @@
+interface:
+  display_name: "SonarCloud"
+  short_description: "Check SonarCloud gates and issues"
+  default_prompt: "Use $sonarcloud to inspect the current quality gate and open issues."

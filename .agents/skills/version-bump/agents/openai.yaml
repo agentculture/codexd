@@ -1,0 +1,4 @@
+interface:
+  display_name: "Version Bump"
+  short_description: "Bump version and changelog entries"
+  default_prompt: "Use $version-bump to prepare a semver bump and changelog entry for this change."

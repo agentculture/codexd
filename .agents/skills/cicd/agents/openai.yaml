@@ -1,0 +1,4 @@
+interface:
+  display_name: "CI/CD"
+  short_description: "Manage codexd PR and CI workflows"
+  default_prompt: "Use $cicd to check the current PR status and handle CI or review feedback."
