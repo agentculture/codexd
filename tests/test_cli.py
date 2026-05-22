@@ -21,4 +21,5 @@ def test_no_args_prints_help(capsys: pytest.CaptureFixture[str]) -> None:
 
     out = capsys.readouterr().out
     assert "codexd" in out
-    assert "reviewable PRs" in out
+    assert "daemon" in out
+    assert "repo" in out

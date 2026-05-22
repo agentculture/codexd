@@ -2,10 +2,10 @@
 
 Codex daemon for delegated repo tasks and reviewable PRs.
 
-`codexd` is an AgentCulture sibling project. It is currently in initial
-scaffold state: package metadata, Culture registration, Codex repo guidance,
-repo-local skills, CI, lint, and tests exist; daemon task orchestration is not
-implemented yet.
+`codexd` is a self-contained Codex agent for the AgentCulture mesh. It can run a
+Codex-backed Culture daemon and can delegate work to remote repositories by
+cloning them into a managed workspace, running Codex app-server, committing
+changes, and pushing a branch.
 
 ## Quick Start
 
@@ -14,6 +14,24 @@ uv sync
 uv run python -m codexd --version
 uv run pytest -n auto --cov=codexd
 ```
+
+## Daemon
+
+```bash
+codexd daemon start spark-codex --config ~/.culture/agents.yaml
+codexd daemon start --all --config ~/.culture/agents.yaml
+```
+
+## Remote Repository Work
+
+```bash
+codexd repo run git@github.com:agentculture/example.git \
+  --branch codex/example-task \
+  --task "Implement the requested change"
+```
+
+Managed checkouts live under `.codexd/work` by default and are cleaned before a
+new clone.
 
 ## Codex Conventions
 

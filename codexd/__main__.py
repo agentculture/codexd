@@ -1,4 +1,4 @@
-"""Entry point for ``python -m codexd``."""
+"""Run codexd as a module."""
 
 from __future__ import annotations
 

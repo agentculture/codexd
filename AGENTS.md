@@ -2,12 +2,10 @@
 
 ## Project State
 
-`codexd` is a greenfield Codex daemon for delegated repository tasks and
-reviewable pull requests in the AgentCulture ecosystem. The current implemented
-surface is intentionally small: Python package metadata, a version-capable CLI,
-Culture registration, Codex instructions, repo-local skills, tests, lint, and CI.
-
-Do not document or assume daemon behavior until code for that behavior exists.
+`codexd` is a Codex-only Culture agent for delegated repository tasks and
+reviewable pull requests in the AgentCulture ecosystem. It includes a runnable
+Codex Culture daemon, repo-local skills, tests, lint, CI, and app-server based
+remote-repository work commands.
 
 ## Project Structure
 
