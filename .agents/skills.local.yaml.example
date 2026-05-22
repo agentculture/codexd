@@ -1,6 +1,8 @@
-# Per-machine config for codexd's repo-local skills.
+# Per-machine config read by codexd's repo-local skill scripts.
 # Copy this to .agents/skills.local.yaml (git-ignored) and adjust locally.
 # Skills should read the local file first and fall back to this example.
+# Codex discovers skills from .agents/skills; this file is not a discovery
+# manifest.
 
 # Path to the Culture server's agent manifest.
 culture_server_yaml: ~/.culture/server.yaml

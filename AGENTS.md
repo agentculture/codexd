@@ -48,6 +48,12 @@ Codex skills belong in `.agents/skills` for repository-local use. If a Culture
 skill is vendored from a legacy source, adapt visible paths and signatures to
 Codex before committing.
 
+When Codex starts inside this repository, repo-local skills should be
+auto-discovered from `.agents/skills`. Use `/skills` or `$` completion to find
+them, and invoke the PR/CI and coordination workflows as `$cicd` and
+`$communicate`. Do not document or expect `/cicd` or `/communicate` as skill
+invocations; slash commands and skill mentions are separate interfaces.
+
 The local `$HOME/.codex/skills` directory is an environment-specific installed
 bundle location, not the canonical repository layout.
 
