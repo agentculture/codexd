@@ -37,6 +37,11 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["codexd"]
 
+
+[tool.hatch.build.targets.wheel.force-include]
+"codexd/agent/culture.yaml" = "codexd/agent/culture.yaml"
+"codexd/agent/skill/SKILL.md" = "codexd/agent/skill/SKILL.md"
+
 [dependency-groups]
 dev = [
     "pytest>=8.0",
