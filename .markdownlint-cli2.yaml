@@ -1,0 +1,15 @@
+# markdownlint-cli2 project configuration.
+
+config:
+  default: true
+  MD013: false
+  MD060: false
+  MD024:
+    siblings_only: true
+
+ignores:
+  - "node_modules/**"
+  - ".local/**"
+  - ".venv/**"
+  - "dist/**"
+  - "build/**"
