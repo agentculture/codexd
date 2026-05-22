@@ -49,6 +49,9 @@ def validate_remote(remote: str) -> str:
         return remote
     if _SSH_REMOTE_RE.match(remote):
         return remote
+    local = Path(remote)
+    if local.is_absolute() and local.exists():
+        return remote
     raise ValueError("remote must be an HTTPS or SSH Git remote")
 
 
