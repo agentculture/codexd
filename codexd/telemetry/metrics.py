@@ -74,7 +74,7 @@ def reset_for_tests() -> None:
         try:
             _meter_provider.shutdown()
         except Exception:  # noqa: BLE001
-            pass
+            logger.debug("MeterProvider shutdown failed during test reset", exc_info=True)
         _meter_provider = None
     _initialized_for = None
     _registry = None

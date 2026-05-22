@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from dataclasses import asdict
 
-from agentirc.config import ServerConfig, TelemetryConfig
+from agentirc.config import ServerConfig
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource

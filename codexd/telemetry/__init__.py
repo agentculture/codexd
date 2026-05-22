@@ -1,6 +1,6 @@
-"""OpenTelemetry integration for Culture.
+"""OpenTelemetry integration for codexd.
 
-Public surface re-exported here; call sites import from `culture.telemetry`.
+Public surface re-exported here; call sites import from `codexd.telemetry`.
 """
 
 from codexd.telemetry.audit import (
