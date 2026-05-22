@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import logging
 
+import grpc
+
 import pytest
 from agentirc.config import ServerConfig, TelemetryConfig
 from opentelemetry.sdk.trace.sampling import (
@@ -31,6 +33,24 @@ def _reset_module_state() -> None:
 
 def _make_config(**telemetry_overrides) -> ServerConfig:
     return ServerConfig(name="test", telemetry=TelemetryConfig(**telemetry_overrides))
+
+
+def _stub_span_exporter_class(exporter_kwargs: list[dict]):
+    class _StubExporter:
+        def __init__(self, **kw) -> None:
+            self.kw = kw
+            exporter_kwargs.append(kw)
+
+        def export(self, spans):  # noqa: D401
+            return 0
+
+        def shutdown(self) -> None:
+            return None
+
+        def force_flush(self, timeout_millis: int = 30000) -> bool:
+            return True
+
+    return _StubExporter
 
 
 # ── _build_sampler ───────────────────────────────────────────────────
@@ -97,6 +117,56 @@ def test_init_telemetry_reinit_on_config_change() -> None:
 # ── init_telemetry — enabled path ────────────────────────────────────
 
 
+def test_init_telemetry_enabled_default_compression_uses_grpc_enum(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    exporter_kwargs: list[dict] = []
+    monkeypatch.setattr(
+        tracing, "OTLPSpanExporter", _stub_span_exporter_class(exporter_kwargs)
+    )
+    cfg = _make_config(enabled=True, traces_enabled=True)
+
+    tracing.init_telemetry(cfg)
+
+    assert exporter_kwargs[0]["compression"] is grpc.Compression.Gzip
+
+
+def test_init_telemetry_unknown_compression_raises() -> None:
+    with pytest.raises(ValueError, match="Unsupported telemetry.otlp_compression"):
+        tracing._grpc_compression("brotli")
+
+
+def test_init_telemetry_enabled_reinit_keeps_first_global_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    exporter_kwargs: list[dict] = []
+    set_calls = 0
+    real_set_tracer_provider = tracing.trace.set_tracer_provider
+
+    def _counting_set_tracer_provider(provider) -> None:
+        nonlocal set_calls
+        set_calls += 1
+        real_set_tracer_provider(provider)
+
+    monkeypatch.setattr(
+        tracing, "OTLPSpanExporter", _stub_span_exporter_class(exporter_kwargs)
+    )
+    monkeypatch.setattr(
+        tracing.trace, "set_tracer_provider", _counting_set_tracer_provider
+    )
+
+    first = _make_config(enabled=True, traces_enabled=True)
+    second = _make_config(enabled=True, traces_enabled=True)
+    second.name = "other"
+
+    first_tracer = tracing.init_telemetry(first)
+    second_tracer = tracing.init_telemetry(second)
+
+    assert second_tracer is first_tracer
+    assert set_calls == 1
+    assert len(exporter_kwargs) == 1
+
+
 def test_init_telemetry_enabled_installs_provider(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -106,20 +176,10 @@ def test_init_telemetry_enabled_installs_provider(
     a no-op replacement that still satisfies BatchSpanProcessor's interface.
     """
 
-    class _StubExporter:
-        def __init__(self, **kw) -> None:
-            self.kw = kw
-
-        def export(self, spans):  # noqa: D401
-            return 0
-
-        def shutdown(self) -> None:
-            return None
-
-        def force_flush(self, timeout_millis: int = 30000) -> bool:
-            return True
-
-    monkeypatch.setattr(tracing, "OTLPSpanExporter", _StubExporter)
+    exporter_kwargs: list[dict] = []
+    monkeypatch.setattr(
+        tracing, "OTLPSpanExporter", _stub_span_exporter_class(exporter_kwargs)
+    )
     cfg = _make_config(
         enabled=True,
         traces_enabled=True,
@@ -129,3 +189,4 @@ def test_init_telemetry_enabled_installs_provider(
     )
     t = tracing.init_telemetry(cfg)
     assert isinstance(t, Tracer)
+    assert exporter_kwargs[0]["compression"] is grpc.Compression.NoCompression

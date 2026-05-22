@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import grpc
 import pytest
 from agentirc.config import ServerConfig, TelemetryConfig
 from opentelemetry.metrics import Counter, Histogram, UpDownCounter
@@ -18,6 +19,30 @@ def _reset_module_state() -> None:
 
 def _make_config(**telemetry_overrides) -> ServerConfig:
     return ServerConfig(name="test", telemetry=TelemetryConfig(**telemetry_overrides))
+
+
+def _stub_metric_exporter_class(exporter_kwargs: list[dict]):
+    from opentelemetry.sdk.metrics.export import MetricExporter, MetricExportResult
+
+    class _StubExporter(MetricExporter):
+        def __init__(self, **kw) -> None:
+            # MetricExporter.__init__ sets _preferred_temporality / _aggregation
+            # from kwargs or sensible defaults; calling super() satisfies the
+            # PeriodicExportingMetricReader contract.
+            super().__init__()
+            self.kw = kw
+            exporter_kwargs.append(kw)
+
+        def export(self, *args, **kwargs) -> MetricExportResult:  # noqa: D401
+            return MetricExportResult.SUCCESS
+
+        def shutdown(self, *args, **kwargs) -> None:
+            return None
+
+        def force_flush(self, timeout_millis: int = 30000) -> bool:
+            return True
+
+    return _StubExporter
 
 
 def test_init_metrics_disabled_returns_proxy_registry() -> None:
@@ -65,26 +90,10 @@ def test_init_metrics_enabled_installs_provider(
     by the next call producing a different registry when name changes).
     """
 
-    from opentelemetry.sdk.metrics.export import MetricExporter, MetricExportResult
-
-    class _StubExporter(MetricExporter):
-        def __init__(self, **kw) -> None:
-            # MetricExporter.__init__ sets _preferred_temporality / _aggregation
-            # from kwargs or sensible defaults; calling super() satisfies the
-            # PeriodicExportingMetricReader contract.
-            super().__init__()
-            self.kw = kw
-
-        def export(self, *args, **kwargs) -> MetricExportResult:  # noqa: D401
-            return MetricExportResult.SUCCESS
-
-        def shutdown(self, *args, **kwargs) -> None:
-            return None
-
-        def force_flush(self, timeout_millis: int = 30000) -> bool:
-            return True
-
-    monkeypatch.setattr(metrics, "OTLPMetricExporter", _StubExporter)
+    exporter_kwargs: list[dict] = []
+    monkeypatch.setattr(
+        metrics, "OTLPMetricExporter", _stub_metric_exporter_class(exporter_kwargs)
+    )
     cfg = _make_config(
         enabled=True,
         metrics_enabled=True,
@@ -96,6 +105,55 @@ def test_init_metrics_enabled_installs_provider(
     assert isinstance(reg.irc_bytes_sent, Counter)
     assert isinstance(reg.s2s_relay_latency, Histogram)
     assert isinstance(reg.s2s_links_active, UpDownCounter)
+    assert exporter_kwargs[0]["compression"] is grpc.Compression.NoCompression
+
+
+def test_init_metrics_enabled_default_compression_uses_grpc_enum(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    exporter_kwargs: list[dict] = []
+    monkeypatch.setattr(
+        metrics, "OTLPMetricExporter", _stub_metric_exporter_class(exporter_kwargs)
+    )
+    cfg = _make_config(enabled=True, metrics_enabled=True)
+
+    metrics.init_metrics(cfg)
+
+    assert exporter_kwargs[0]["compression"] is grpc.Compression.Gzip
+
+
+def test_init_metrics_unknown_compression_raises() -> None:
+    with pytest.raises(ValueError, match="Unsupported telemetry.otlp_compression"):
+        metrics._grpc_compression("brotli")
+
+
+def test_init_metrics_enabled_reinit_keeps_first_global_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    exporter_kwargs: list[dict] = []
+    set_calls = 0
+    real_set_meter_provider = metrics.metrics.set_meter_provider
+
+    def _counting_set_meter_provider(provider) -> None:
+        nonlocal set_calls
+        set_calls += 1
+        real_set_meter_provider(provider)
+
+    monkeypatch.setattr(
+        metrics, "OTLPMetricExporter", _stub_metric_exporter_class(exporter_kwargs)
+    )
+    monkeypatch.setattr(metrics.metrics, "set_meter_provider", _counting_set_meter_provider)
+
+    first = _make_config(enabled=True, metrics_enabled=True)
+    second = _make_config(enabled=True, metrics_enabled=True)
+    second.name = "other"
+
+    first_registry = metrics.init_metrics(first)
+    second_registry = metrics.init_metrics(second)
+
+    assert second_registry is first_registry
+    assert set_calls == 1
+    assert len(exporter_kwargs) == 1
 
 
 def test_reset_for_tests_shutdown_swallows_errors(
@@ -112,18 +170,17 @@ def test_reset_for_tests_shutdown_swallows_errors(
     assert metrics._meter_provider is None
 
 
-def test_init_metrics_reinit_shutdown_error_is_logged(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+def test_init_metrics_disabled_leaves_existing_provider_untouched(
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     class _BadProvider:
-        def shutdown(self) -> None:
-            raise RuntimeError("simulated failure")
+        pass
 
+    provider = _BadProvider()
     cfg = _make_config(enabled=False)
-    monkeypatch.setattr(metrics, "_meter_provider", _BadProvider())
-    with caplog.at_level("DEBUG", logger="codexd.telemetry.metrics"):
-        reg = metrics.init_metrics(cfg)
+    monkeypatch.setattr(metrics, "_meter_provider", provider)
+
+    reg = metrics.init_metrics(cfg)
 
     assert reg is not None
-    assert metrics._meter_provider is None
-    assert any("MeterProvider shutdown failed" in r.message for r in caplog.records)
+    assert metrics._meter_provider is provider

@@ -2,12 +2,13 @@
 
 `init_metrics(config)` is idempotent — safe to call from multiple places.
 When `config.telemetry.enabled` or `metrics_enabled` is False, returns a
-MetricsRegistry whose instruments are bound to OTEL's proxy meter that
-becomes a real meter only if a provider is later installed. In production
-this is effectively no-op (no provider is installed). In tests, callers
-MUST `reset_for_tests()` between disabled-init and the `metrics_reader`
-fixture, otherwise the cached proxy instruments would forward to the
-freshly-installed test provider.
+MetricsRegistry without installing or replacing the global OTEL provider.
+Enabled initialization installs the process-global provider once; later
+enabled calls reuse the first provider because OpenTelemetry does not
+support global provider replacement. In tests, callers MUST
+`reset_for_tests()` between disabled-init and the `metrics_reader` fixture,
+otherwise the cached proxy instruments would forward to the freshly-installed
+test provider.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from __future__ import annotations
 import logging
 from dataclasses import asdict, dataclass
 
+import grpc
 from agentirc.config import ServerConfig
 from opentelemetry import metrics
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
@@ -29,6 +31,7 @@ _CULTURE_METER_NAME = "culture.agentirc"
 _initialized_for: dict | None = None
 _meter_provider: "MeterProvider | None" = None
 _registry: "MetricsRegistry | None" = None
+_enabled_registry: "MetricsRegistry | None" = None
 
 
 @dataclass
@@ -69,13 +72,14 @@ class MetricsRegistry:
 
 def reset_for_tests() -> None:
     """Reset module state so each test gets a fresh provider. Test-only."""
-    global _initialized_for, _meter_provider, _registry
+    global _enabled_registry, _initialized_for, _meter_provider, _registry
     if _meter_provider is not None:
         try:
             _meter_provider.shutdown()
         except Exception:  # noqa: BLE001
             logger.debug("MeterProvider shutdown failed during test reset", exc_info=True)
         _meter_provider = None
+    _enabled_registry = None
     _initialized_for = None
     _registry = None
     # _METER_PROVIDER and Once live on the _internal sub-package, not the
@@ -84,6 +88,24 @@ def reset_for_tests() -> None:
 
     _mi._METER_PROVIDER = None
     _mi._METER_PROVIDER_SET_ONCE = _mi.Once()
+
+
+def _grpc_compression(value: str | None) -> grpc.Compression:
+    """Parse TelemetryConfig OTLP compression for gRPC exporters."""
+    if value is None or value == "" or value == "none":
+        return grpc.Compression.NoCompression
+    if value == "gzip":
+        return grpc.Compression.Gzip
+    raise ValueError(
+        "Unsupported telemetry.otlp_compression "
+        f"{value!r}; expected 'gzip', 'none', or empty"
+    )
+
+
+def _global_meter_provider_is_set() -> bool:
+    import opentelemetry.metrics._internal as _mi  # type: ignore[attr-defined]
+
+    return _mi._METER_PROVIDER is not None
 
 
 def _build_registry(meter: Meter) -> MetricsRegistry:
@@ -191,7 +213,7 @@ def init_metrics(config: ServerConfig) -> MetricsRegistry:
     — call sites can `instrument.add(...)` / `.record(...)` unconditionally
     without guards. Production never installs a provider in this case.
     """
-    global _initialized_for, _meter_provider, _registry
+    global _enabled_registry, _initialized_for, _meter_provider, _registry
 
     tcfg = config.telemetry
     # Include config.name so two IRCd instances with identical TelemetryConfig
@@ -201,19 +223,26 @@ def init_metrics(config: ServerConfig) -> MetricsRegistry:
     if _initialized_for == snapshot and _registry is not None:
         return _registry
 
-    # Tear down the previous SDK provider before installing a new one.
-    # PeriodicExportingMetricReader spawns a background thread that needs an
-    # explicit shutdown call; otherwise tests leak workers and may double-export.
-    if _meter_provider is not None:
-        try:
-            _meter_provider.shutdown()
-        except Exception:  # noqa: BLE001 - shutdown errors must not crash init
-            logger.debug("MeterProvider shutdown failed", exc_info=True)
-        _meter_provider = None
-
     if not tcfg.enabled or not tcfg.metrics_enabled:
         meter = metrics.get_meter(_CULTURE_METER_NAME)
         _registry = _build_registry(meter)
+        _initialized_for = snapshot
+        return _registry
+
+    if _meter_provider is not None:
+        # OpenTelemetry allows setting the global provider only once. Keep the
+        # first enabled provider alive and make later enabled init calls reuse it.
+        if _enabled_registry is None:
+            _enabled_registry = _build_registry(metrics.get_meter(_CULTURE_METER_NAME))
+        _registry = _enabled_registry
+        _initialized_for = snapshot
+        return _registry
+
+    if _global_meter_provider_is_set():
+        logger.info(
+            "OTEL metrics provider already installed; reusing existing global provider"
+        )
+        _registry = _build_registry(metrics.get_meter(_CULTURE_METER_NAME))
         _initialized_for = snapshot
         return _registry
 
@@ -226,7 +255,7 @@ def init_metrics(config: ServerConfig) -> MetricsRegistry:
     exporter = OTLPMetricExporter(
         endpoint=tcfg.otlp_endpoint,
         timeout=tcfg.otlp_timeout_ms / 1000.0,
-        compression=(None if tcfg.otlp_compression == "none" else tcfg.otlp_compression),
+        compression=_grpc_compression(tcfg.otlp_compression),
     )
     reader = PeriodicExportingMetricReader(
         exporter=exporter,
@@ -238,6 +267,7 @@ def init_metrics(config: ServerConfig) -> MetricsRegistry:
 
     meter = metrics.get_meter(_CULTURE_METER_NAME)
     _registry = _build_registry(meter)
+    _enabled_registry = _registry
     _initialized_for = snapshot
     logger.info(
         "OTEL metrics initialized: service=%s instance=%s endpoint=%s interval=%dms",

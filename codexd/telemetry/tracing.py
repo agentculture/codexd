@@ -3,7 +3,9 @@
 `init_telemetry(config)` is idempotent — safe to call from multiple places
 (e.g. IRCd.__init__ and ServerLink.__init__ for independent test servers).
 When `config.telemetry.enabled` is False, returns a no-op tracer without
-touching the global provider.
+touching the global provider. Enabled initialization installs the
+process-global provider once; later enabled calls reuse the first provider
+because OpenTelemetry does not support global provider replacement.
 """
 
 from __future__ import annotations
@@ -11,6 +13,7 @@ from __future__ import annotations
 import logging
 from dataclasses import asdict
 
+import grpc
 from agentirc.config import ServerConfig
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
@@ -35,16 +38,39 @@ _CULTURE_TRACER_NAME = "culture.agentirc"
 # reference to the same mutable object).
 _initialized_for: dict | None = None
 _tracer: Tracer | None = None
+_tracer_provider: TracerProvider | None = None
 
 
 def reset_for_tests() -> None:
     """Reset module state so each test gets a fresh provider. Test-only."""
-    global _initialized_for, _tracer
+    global _initialized_for, _tracer, _tracer_provider
+    if _tracer_provider is not None:
+        try:
+            _tracer_provider.shutdown()
+        except Exception:  # noqa: BLE001
+            logger.debug("TracerProvider shutdown failed during test reset", exc_info=True)
+        _tracer_provider = None
     _initialized_for = None
     _tracer = None
     # Reset the global OTEL provider too, so one test's SDK doesn't leak.
     trace._TRACER_PROVIDER = None  # type: ignore[attr-defined]
     trace._TRACER_PROVIDER_SET_ONCE = trace.Once()  # type: ignore[attr-defined]
+
+
+def _grpc_compression(value: str | None) -> grpc.Compression:
+    """Parse TelemetryConfig OTLP compression for gRPC exporters."""
+    if value is None or value == "" or value == "none":
+        return grpc.Compression.NoCompression
+    if value == "gzip":
+        return grpc.Compression.Gzip
+    raise ValueError(
+        "Unsupported telemetry.otlp_compression "
+        f"{value!r}; expected 'gzip', 'none', or empty"
+    )
+
+
+def _global_tracer_provider_is_set() -> bool:
+    return trace._TRACER_PROVIDER is not None  # type: ignore[attr-defined]
 
 
 def _build_sampler(name: str) -> Sampler:
@@ -72,7 +98,7 @@ def init_telemetry(config: ServerConfig) -> Tracer:
     not install an SDK provider — this keeps tests, and servers that opt
     out of telemetry, from paying any SDK cost.
     """
-    global _initialized_for, _tracer
+    global _initialized_for, _tracer, _tracer_provider
 
     tcfg = config.telemetry
     # Compare against an immutable snapshot so in-place mutation of the
@@ -89,6 +115,22 @@ def init_telemetry(config: ServerConfig) -> Tracer:
         _initialized_for = snapshot
         return _tracer
 
+    if _tracer_provider is not None:
+        # OpenTelemetry allows setting the global provider only once. Keep the
+        # first enabled provider alive and make later enabled init calls reuse it.
+        if _tracer is None:
+            _tracer = trace.get_tracer(_CULTURE_TRACER_NAME)
+        _initialized_for = snapshot
+        return _tracer
+
+    if _global_tracer_provider_is_set():
+        logger.info(
+            "OTEL tracing provider already installed; reusing existing global provider"
+        )
+        _tracer = trace.get_tracer(_CULTURE_TRACER_NAME)
+        _initialized_for = snapshot
+        return _tracer
+
     resource = Resource.create(
         {
             "service.name": tcfg.service_name,
@@ -99,10 +141,11 @@ def init_telemetry(config: ServerConfig) -> Tracer:
     exporter = OTLPSpanExporter(
         endpoint=tcfg.otlp_endpoint,
         timeout=tcfg.otlp_timeout_ms / 1000.0,
-        compression=(None if tcfg.otlp_compression == "none" else tcfg.otlp_compression),
+        compression=_grpc_compression(tcfg.otlp_compression),
     )
     provider.add_span_processor(BatchSpanProcessor(exporter))
     trace.set_tracer_provider(provider)
+    _tracer_provider = provider
 
     _tracer = trace.get_tracer(_CULTURE_TRACER_NAME)
     _initialized_for = snapshot
